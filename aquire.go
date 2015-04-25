@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/crakalakin/atlas"
+	"github.com/brianfoshee/atlas"
 	"bytes"
 	"encoding/json"
 	"fmt"
