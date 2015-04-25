@@ -5,58 +5,94 @@ import (
 	"github.com/davecheney/i2c"
 	"errors"
 	"strings"
+	"strconv"
+	"time"
 )
 
 type Atlas struct {
 	// Provides opportunity to extend to include serial
 	// Improvement Note: Use enum {i2c,serial}?
 	protocol string
-	// Represents type of atlas chip.
-	// Improvement NOte: Use enum {ph,tds,ec,orp}?
-	type string
+	// Represents chip of atlas chip.
+	// Improvement NOte: Use enum {ph,ec,ec,orp}?
+	chip string
 	reading float64
 	i2cAccess *i2c.I2C
 }
 
 func New(chip string) (*Atlas, error) {
-
 	// Default i2c address for atlas chips
 	do := uint8(0x61)
 	orp := uint8(0x62)
 	ph := uint8(0x63)
-        tds := uint8(0x64)
+        ec := uint8(0x64)
+
+	var addr uint8
 
 	// Hard coding protocol for now
 	protocol := "i2c"
 
 	chip = strings.ToLower(chip)
 	switch chip {
-	case "tds":
-		i2cAccess, err := i2c.New(tds, 1)
-		return &AtlasI2C{i2cAccess: i2cAccess, type: "tds", reading: 0.0, protocol: protocol}
-	case "ph":
-		i2cAccess, err := i2c.New(ph, 1)
-		return &AtlasI2C{i2cAccess: i2cAccess, type: "ph", reading: 0.0, protocol: protocol}
 	case "do":
-		i2cAccess, err := i2c.New(do, 1)
-		return &AtlasI2C{i2cAccess: i2cAccess, type: "do", reading: 0.0, protocol: protocol}
-	case "orp":
-		i2cAccess, err := i2c.New(orp, 1)
-		return &AtlasI2C{i2cAccess: i2cAccess, type: "orp", reading: 0.0, protocol: protocol}
+		addr = do
+	case "opr":
+		addr = orp
+	case "ph":
+		addr = ph
+	case "ec":
+		addr = ec
 	default:
-		unsupportedChip := errors.New("Unsupported chip type")
+		unsupportedChip := errors.New("Unsupported chip")
 		return nil,unsupportedChip
+	}
+
+	i2cAccess, err := i2c.New(addr, 1)
+	if err != nil {
+               	fmt.Println("Unable to open DO I2C Device")
+        }	
+	return &Atlas{i2cAccess: i2cAccess, chip: chip, reading: 0.0, protocol: protocol},nil
 }
 
-func (atlas *Atlas) getPhReading(temp []byte) {
-	_, err := atlas.i2cAccess.Write(temp)
+// UpdateReading gets a reading from the appropriate atlas chip
+// and stores it in Atlas.reading
+func (atlas *Atlas) UpdateReading(temp []byte) {
+	switch atlas.chip {
+	case "do":
+		atlas.reading = getDoReading(atlas.i2cAccess, temp)
+	case "orp":
+		atlas.reading = getOrpReading(atlas.i2cAccess, temp)
+	case "ph":
+		atlas.reading = getPhReading(atlas.i2cAccess, temp)
+	case "ec":
+		atlas.reading = getEcReading(atlas.i2cAccess, temp)
+	}
+
+}
+
+// GetReading returns the current value of Atlas.reading
+func (atlas *Atlas) GetReading() float64 {
+	return atlas.reading
+}
+
+// Stub for future development
+func getDoReading(i2cAccess *i2c.I2C, temp []byte) float64 {
+	return 1.0
+}
+// Stub for future development
+func getOrpReading(i2cAccess *i2c.I2C, temp []byte) float64 {
+	return 1.0
+}
+
+func getPhReading(i2cAccess *i2c.I2C, temp []byte) float64 {
+	_, err := i2cAccess.Write(temp)
 	if err != nil {
 		fmt.Println("Error writing byte")
 	}
 	time.Sleep(time.Millisecond * 300)
 
 
-	_, err = atlas.i2cAccess.WriteByte(0x52)
+	_, err = i2cAccess.WriteByte(0x52)
 	if err != nil {
 		fmt.Println("Error writing byte")
 	}
@@ -64,7 +100,7 @@ func (atlas *Atlas) getPhReading(temp []byte) {
 	time.Sleep(time.Second * 1)
 
 	buf := make([]byte, 7)
-	_, err = atlas.i2cAccess.Read(buf)
+	_, err = i2cAccess.Read(buf)
 	if err != nil {
 		fmt.Println("Error reading bytes")
 	}
@@ -74,27 +110,28 @@ func (atlas *Atlas) getPhReading(temp []byte) {
 	if err != nil {
 		fmt.Println("getPhReading() - Error converting reading to float: ", err)
 	}
-	atlas.reading = r
+	//atlas.reading = r
+	return r
 }
 
-func (atlas *Atlas) getEcReading(temp []byte) {
-	_, err := atlas.i2cAccess.Write(temp)
+func getEcReading(i2cAccess *i2c.I2C, temp []byte) float64 {
+	_, err := i2cAccess.Write(temp)
 	if err != nil {
 		fmt.Println("Error writing byte")
 	}
 	time.Sleep(time.Millisecond * 300)
 
-	_, err = atlas.i2cAccess.WriteByte(0x52)
+	_, err = i2cAccess.WriteByte(0x52)
 	if err != nil {
 		fmt.Println("Error writing byte")
 	}
 	time.Sleep(time.Second * 1)
 
 	buf := make([]byte, 32)
-	_, err = atlas.i2cAccess.Read(buf)
+	_, err = i2cAccess.Read(buf)
 	if err != nil {
 		fmt.Println("Error reading bytes")
-		return 1000.0
+		//return 1000.0
 	}
 	reading := strings.Split(string(buf), ",")[1]
 	reading = strings.Trim(reading, "\x01")
@@ -102,9 +139,12 @@ func (atlas *Atlas) getEcReading(temp []byte) {
         if err != nil {
                 fmt.Println("getEcReading() - Error converting reading to float: ", err)
         }
-        atlas.reading = r
+        //atlas.reading = r
+	return r
 }
-func (atlas *Atlas) chipSleep() {
+
+// Sleep puts the chip into a low power state
+func (atlas *Atlas) Sleep() {
         sleep := "Sleep"
         byteArray := []byte(sleep)
         _, err := atlas.i2cAccess.Write(byteArray)
@@ -113,8 +153,10 @@ func (atlas *Atlas) chipSleep() {
         }
         time.Sleep(time.Millisecond * 300)
 }
-// Improvement Note: Provide support for mid and high range ec probes
-func (atlas *Atlas) setProbeType() {
+
+// SetEcProbe tells the EC chip what type of EC probe is being used
+// Improvement Note: Needs to provide support for mid and high range ec probes
+func (atlas *Atlas) SetEcProbe() {
         lowRange := []byte{0x4B, 0x2C, 0x30, 0x2E, 0x31}
         n, err := atlas.i2cAccess.Write(lowRange)
 
@@ -130,78 +172,106 @@ func (atlas *Atlas) setProbeType() {
                 fmt.Println("Error reading bytes")
         }
 }
-func (atlas *Atlas) chipWake() {
-        _, err := i2cAccess.WriteByte(0x52)
+
+// Wake sends a command to the chip to wake it up from sleep mode
+func (atlas *Atlas) Wake() {
+        _, err := atlas.i2cAccess.WriteByte(0x52)
         time.Sleep(time.Millisecond * 300)
-        _, err = i2cAccess.WriteByte(0x52)
+        _, err = atlas.i2cAccess.WriteByte(0x52)
         if err != nil {
                 fmt.Println("chipWake() - Error writing byte")
         }
 	time.Sleep(time.Second * 1)
 }
-func (atlas *Atlas) calibrateLow() {
-        var dummy string
-        fmt.Println("Press any key to perform 4.0 calibration")
-        _,_ = fmt.Scanln(&dummy)
 
-        calibrateLow := "Cal,low,4.00"
-        byteArray := []byte(calibrateLow)
-
-        _, err := atlas.i2cAccess.Write(byteArray)
-        if err != nil {
-                fmt.Println("Error writing byte")
-        }
-        time.Sleep(time.Millisecond * 2000)
-        fmt.Println("Calibration Complete")
-        buf := make([]byte, 20)
-        _, err = atlas.i2cAccess.Read(buf)
-        if err != nil {
-                fmt.Println("Error reading bytes")
-        }
+// Calibrate uses the Atlas.chip type to calibrate the sensor
+// based on what type of chip it is.
+func (atlas *Atlas) Calibrate() {
+	switch atlas.chip {
+	case "do":
+		calibrateDo(atlas.i2cAccess)
+	case "orp":
+		calibrateOrp(atlas.i2cAccess)
+	case "ph":
+		calibratePh(atlas.i2cAccess)
+	case "ec":
+		calibrateEc(atlas.i2cAccess)
+	}
 }
-func (atlas *Atlas) calibrateMid() {
+
+
+// Stub for future development
+func calibrateDo (i2cAccess *i2c.I2C) {
+}
+
+// Stub for future development
+func calibrateOrp (i2cAccess *i2c.I2C) {
+}
+
+func calibratePh (i2cAccess *i2c.I2C) {
         var dummy string
-        fmt.Println("Press any key to calibrate using mid range solution")
+        fmt.Println("Press any key to perform 7.0 solution")
         _,_ = fmt.Scanln(&dummy)
 
         calibrateMid := "Cal,mid,7.00"
         byteArray := []byte(calibrateMid)
 
-        _, err := atlas.i2cAccess.Write(byteArray)
+        _, err := i2cAccess.Write(byteArray)
         if err != nil {
                 fmt.Println("Error writing byte")
         }
 
         time.Sleep(time.Millisecond * 2000)
-        fmt.Println("Calibration Complete")
+        fmt.Println("7.0 Calibration Complete")
         buf := make([]byte, 20)
-        _, err = atlas.i2cAccess.Read(buf)
+        _, err = i2cAccess.Read(buf)
         if err != nil {
                 fmt.Println("Error reading bytes")
         }
-}
-func (atlas *Atlas) calibrateHigh() {
-        var dummy string
-        fmt.Println("Press any key to calibrate using high range solution")
+
+        fmt.Println("Press any key to perform 4.0 calibration")
+        _,_ = fmt.Scanln(&dummy)
+
+        calibrateLow := "Cal,low,4.00"
+        byteArray = []byte(calibrateLow)
+
+        _, err = i2cAccess.Write(byteArray)
+        if err != nil {
+                fmt.Println("Error writing byte")
+        }
+        time.Sleep(time.Millisecond * 2000)
+        fmt.Println("4.0 Calibration Complete")
+        _, err = i2cAccess.Read(buf)
+        if err != nil {
+                fmt.Println("Error reading bytes")
+        }
+
+        fmt.Println("Press any key to perform 10.0 calibration")
         _,_ = fmt.Scanln(&dummy)
 
         calibrateHigh := "Cal,high,10.00"
-        byteArray := []byte(calibrateHigh)
-        _, err := atlas.i2cAccess.Write(byteArray)
+        byteArray = []byte(calibrateHigh)
+        _, err = i2cAccess.Write(byteArray)
         if err != nil {
                 fmt.Println("Error writing byte")
         }
         time.Sleep(time.Millisecond * 2000)
-        fmt.Println("Calibration Complete")
-        buf := make([]byte, 20)
-        _, err = atlas.i2cAccess.Read(buf)
+        fmt.Println("10.0 Calibration Complete")
+        _, err = i2cAccess.Read(buf)
         if err != nil {
                 fmt.Println("Error reading bytes")
         }
 }
-func (atlas *Atlas) getStatus() {
+
+// Stub for future development
+func calibrateEc (i2cAccess *i2c.I2C) {
+}
+
+
+// Status returns the status of the chip
+func (atlas *Atlas) Status() string {
         status := []byte{0x53, 0x54, 0x41, 0x54, 0x55, 0x53}
-        n, err := atlas.i2cAccess.Write(status)
+        _, err := atlas.i2cAccess.Write(status)
 
         if err != nil {
                 fmt.Println("Error writing byte")
@@ -209,9 +279,9 @@ func (atlas *Atlas) getStatus() {
         time.Sleep(time.Second * 1)
 
         buf := make([]byte, 20)
-        r, err := atlas.i2cAccess.Read(buf)
+        _, err = atlas.i2cAccess.Read(buf)
         if err != nil {
                 fmt.Println("Error reading bytes")
         }
-        fmt.Println(string(buf))
+        return (string(buf))
 }
