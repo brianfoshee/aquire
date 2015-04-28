@@ -59,7 +59,6 @@ func main() {
 		// update ecChip.reading
 		ecChip.UpdateReading(byteTemp)
 		if err != nil {
-			// Improvement Note: Add logging
 			fmt.Println(err)
 		}
 
