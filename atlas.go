@@ -11,11 +11,7 @@ import (
 )
 
 type Atlas struct {
-	// Provides opportunity to extend to include serial
-	// Improvement Note: Use enum {i2c,serial}?
 	protocol string
-	// Represents chip of atlas chip.
-	// Improvement NOte: Use enum {ph,ec,ec,orp}?
 	chip      string
 	reading   float64
 	i2cAccess *i2c.I2C
@@ -61,7 +57,6 @@ func New(chip string) (*Atlas, error) {
 // UpdateReading gets a reading from the appropriate atlas chip
 // and stores it in Atlas.reading
 func (atlas *Atlas) UpdateReading(temp []byte) error {
-
 	var newReading float64
 	var err error
 
@@ -106,7 +101,6 @@ func getOrpReading(i2cAccess *i2c.I2C, temp []byte) (float64, error) {
 }
 
 func getPhReading(i2cAccess *i2c.I2C, temp []byte) (float64, error) {
-
 	// Temperature calibration
 	_, err := i2cAccess.Write(temp)
 	if err != nil {
@@ -145,7 +139,6 @@ func getPhReading(i2cAccess *i2c.I2C, temp []byte) (float64, error) {
 }
 
 func getEcReading(i2cAccess *i2c.I2C, temp []byte) (float64, error) {
-
 	// Temperature calibration
 	_, err := i2cAccess.Write(temp)
 	if err != nil {
