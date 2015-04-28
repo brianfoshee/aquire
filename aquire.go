@@ -1,13 +1,14 @@
 package main
 
 import (
-	"github.com/brianfoshee/atlas"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/brianfoshee/atlas"
 	"github.com/raspberrypi/onewire"
 )
 
@@ -31,11 +32,11 @@ func main() {
 		if err != nil {
 			fmt.Print(err)
 		}
-		tempC := float64(tempRaw/1000)
-		tempF := float64(tempC * 9.0/5.0 + 32.0)
-	
+		tempC := float64(tempRaw / 1000)
+		tempF := float64(tempC*9.0/5.0 + 32.0)
+
 		stringTemp := strconv.FormatFloat(tempC, 'f', 2, 64)
-		stringTemp = "T,"+stringTemp
+		stringTemp = "T," + stringTemp
 		byteTemp := []byte(stringTemp)
 
 		phChip.UpdateReading(byteTemp)
@@ -46,7 +47,7 @@ func main() {
 		fmt.Println("PH: ", phReading)
 		fmt.Println("TDS: ", tdsReading)
 		fmt.Println("Temp: ", tempF)
-	
+
 		isoDateTime := time.Now().UTC().Format(time.RFC3339)
 
 		rdgns := map[string]interface{}{
