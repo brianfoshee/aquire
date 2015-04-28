@@ -52,7 +52,6 @@ func main() {
 		// update phChip.reading
 		err = phChip.UpdateReading(byteTemp)
 		if err != nil {
-			// Improvement Note: Add logging
 			fmt.Println(err)
 		}
 
@@ -82,7 +81,6 @@ func main() {
 		// json enocde structure
 		b, err := json.Marshal(rdgns)
 		if err != nil {
-			// Improvement Note: Add logging
 			fmt.Println(err)
 		}
 		buf := bytes.NewBuffer(b)
@@ -90,7 +88,6 @@ func main() {
 		// post readings to server
 		resp, err := http.Post("http://gowebz.herokuapp.com/devices/MockClient1/readings", "application/json", buf)
 		if err != nil {
-			// Improvement Note: Add logging
 			fmt.Println(err)
 		}
 
