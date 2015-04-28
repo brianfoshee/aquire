@@ -10,6 +10,7 @@ import (
 	"github.com/davecheney/i2c"
 )
 
+// Atlas represents an atlas scientific circuit
 type Atlas struct {
 	protocol string
 	chip      string
