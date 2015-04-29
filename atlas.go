@@ -10,7 +10,7 @@ import (
 	"github.com/davecheney/i2c"
 )
 
-// Atlas represents an atlas scientific circuit
+// Atlas represents an atlas scientific EZO circuit
 type Atlas struct {
 	protocol string
 	chip      string
@@ -18,7 +18,7 @@ type Atlas struct {
 	i2cAccess *i2c.I2C
 }
 
-// New create an i2c connection to one of the following atlas chips:
+// New creates an i2c connection to one of the following atlas chips:
 // {do, orp, ph, ec}
 func New(chip string) (*Atlas, error) {
 	// Default i2c address for atlas chips
@@ -36,7 +36,7 @@ func New(chip string) (*Atlas, error) {
 	switch chip {
 	case "do":
 		addr = do
-	case "opr":
+	case "orp":
 		addr = orp
 	case "ph":
 		addr = ph
@@ -52,6 +52,7 @@ func New(chip string) (*Atlas, error) {
 		return nil, err
 	}
 
+	// Return success
 	return &Atlas{i2cAccess: i2cAccess, chip: chip, reading: 0.0, protocol: protocol}, nil
 }
 
