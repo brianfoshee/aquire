@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/brianfoshee/atlas"
-	"github.com/raspberrypi/onewire"
+	"github.com/brianfoshee/aquire/atlas"
+	"github.com/brianfoshee/raspberrypi/onewire"
 )
 
 func main() {
