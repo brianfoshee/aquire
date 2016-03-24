@@ -1,15 +1,15 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"net/http"
+	"log"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/brianfoshee/aquire/atlas"
 	"github.com/brianfoshee/raspberrypi/onewire"
+	"github.com/quipo/statsd"
 )
 
 func main() {
@@ -31,6 +31,16 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	prefix := "aquaponics."
+	statsdclient := statsd.NewStatsdClient("159.203.144.95:8125", prefix)
+	if err := statsdclient.CreateSocket(); err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+	interval := time.Second * 10
+	stats := statsd.NewStatsdBuffer(interval, statsdclient)
+	defer stats.Close()
 
 	// Forever
 	for {
@@ -66,34 +76,12 @@ func main() {
 		phReading := phChip.GetReading()
 		tdsReading := ecChip.GetReading()
 
-		// jot down the time
-		isoDateTime := time.Now().UTC().Format(time.RFC3339)
+		ns := "testdevice0"
 
-		// create data structure dictated by server
-		rdgns := map[string]interface{}{
-			"created_at": isoDateTime,
-			"sensor_data": map[string]float64{
-				"water_temperature": tempF,
-				"tds":               tdsReading,
-				"ph":                phReading,
-			},
-		}
-
-		// json enocde structure
-		b, err := json.Marshal(rdgns)
-		if err != nil {
-			fmt.Println(err)
-		}
-		buf := bytes.NewBuffer(b)
-
-		// post readings to server
-		resp, err := http.Post("http://gowebz.herokuapp.com/devices/MockClient1/readings", "application/json", buf)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		// Log Post and response
-		fmt.Println("Data: ", rdgns)
-		fmt.Println("Response: ", resp)
+		// send to statsd
+		stats.FGauge(ns+".watertempf", tempF)
+		stats.FGauge(ns+".watertempc", tempC)
+		stats.FGauge(ns+".tds", tdsReading)
+		stats.FGauge(ns+".ph", phReading)
 	}
 }
