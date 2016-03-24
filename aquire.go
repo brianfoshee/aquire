@@ -4,15 +4,53 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/user"
 	"strconv"
 	"time"
-
+	"github.com/pborman/uuid"
 	"github.com/brianfoshee/aquire/atlas"
 	"github.com/brianfoshee/raspberrypi/onewire"
 	"github.com/quipo/statsd"
 )
 
 func main() {
+
+	deviceId := uuid.NewRandom().String()
+	usr,err := user.Current()
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	deviceIdPath := usr.HomeDir + "/.hydroPiId"
+
+	// if the device id exists on the device
+	if _, err := os.Stat(deviceIdPath); err == nil {
+		// open the file containing the id 
+		f, err := os.Open(deviceIdPath)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		b := make([]byte,36)
+		_, err = f.Read(b)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		deviceId = string(b)
+
+		fmt.Println("Using existing device id:", deviceId)
+
+	// if the device id does not exists
+	} else {
+		f,err := os.Create(deviceIdPath)
+		if err != nil {
+			fmt.Println(err)
+		}
+		f.WriteString(deviceId)
+		fmt.Println("Generated new device id:", deviceId)
+		fmt.Println("Saving id to", deviceIdPath)
+	}
 
 	// open 1-wire communication to temp sensor
 	oneWire, err := onewire.NewDS18S20("28-031466321eff")
@@ -76,7 +114,7 @@ func main() {
 		phReading := phChip.GetReading()
 		tdsReading := ecChip.GetReading()
 
-		ns := "testdevice0"
+		ns := deviceId
 
 		// send to statsd
 		stats.FGauge(ns+".watertempf", tempF)
