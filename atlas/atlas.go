@@ -234,87 +234,102 @@ func (atlas *Atlas) Wake() error {
 
 // Calibrate uses the Atlas.chip type to calibrate the sensor
 // based on what type of chip it is.
-func (atlas *Atlas) Calibrate() {
+func (atlas *Atlas) Calibrate(solution float64) error {
 	switch atlas.chip {
 	case "do":
-		calibrateDo(atlas.i2cAccess)
+		err := calibrateDo(atlas.i2cAccess)
+		if err != nil {
+			return err
+		}
+		return nil
 	case "orp":
-		calibrateOrp(atlas.i2cAccess)
+		err := calibrateOrp(atlas.i2cAccess)
+		if err != nil {
+			return err
+		}
+		return nil
 	case "ph":
-		calibratePh(atlas.i2cAccess)
+		err := calibratePh(atlas.i2cAccess, solution)
+		if err != nil {
+			return err
+		}
+		return nil
 	case "ec":
-		calibrateEc(atlas.i2cAccess)
+		err := calibrateEc(atlas.i2cAccess)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
+
+	// if the chip does not match any of the above, return error
+	err := fmt.Errorf("Uknown atlas chip type: %s", atlas.chip)
+	return err
 }
 
 // Stub for future development
-func calibrateDo(i2cAccess *i2c.I2C) {
+func calibrateDo(i2cAccess *i2c.I2C) error {
+	return nil
 }
 
 // Stub for future development
-func calibrateOrp(i2cAccess *i2c.I2C) {
+func calibrateOrp(i2cAccess *i2c.I2C) error {
+	return nil
 }
 
-func calibratePh(i2cAccess *i2c.I2C) error {
-	var dummy string
-	fmt.Println("Press any key to perform 7.0 solution")
-	_, _ = fmt.Scanln(&dummy)
+func calibratePh(i2cAccess *i2c.I2C, solution float64) error {
 
-	calibrateMid := "Cal,mid,7.00"
-	byteArray := []byte(calibrateMid)
+	// define string to store atlas calibration command
+	var cal string
 
+	// set calibration command according to provided solution
+	if (solution >= 0 && solution <= 6) {
+		cal = fmt.Sprintf("Cal,low,%f",solution)
+	} else if (solution > 6 && solution < 8) {
+		cal = fmt.Sprintf("Cal,mid,%f",solution)
+	} else if (solution >= 8 && solution <= 14) {
+		cal = fmt.Sprintf("Cal,high,%f",solution)
+	} else {
+		return errors.New("PH calibration solution out of range")
+	}
+
+	// Convert calibration string to bytes
+	byteArray := []byte(cal)
+
+	// Send bytes to atlas chip
 	_, err := i2cAccess.Write(byteArray)
 	if err != nil {
 		return err
 	}
 
-	time.Sleep(time.Millisecond * 2000)
-	fmt.Println("7.0 Calibration Complete")
+	// wait for atlas chip
+	time.Sleep(time.Millisecond * 1600)
+
+	// read response from atlas chip
 	buf := make([]byte, 20)
 	_, err = i2cAccess.Read(buf)
 	if err != nil {
 		return err
 	}
-
-	fmt.Println("Press any key to perform 4.0 calibration")
-	_, _ = fmt.Scanln(&dummy)
-
-	calibrateLow := "Cal,low,4.00"
-	byteArray = []byte(calibrateLow)
-
-	_, err = i2cAccess.Write(byteArray)
-	if err != nil {
-		return err
+	
+	// if first byte is 1 return success
+	if buf[0] == 1 {
+		return nil
+	// otherwise return appropriate error
+	} else if buf[0] == 2 {
+		return errors.New("Chip response: request failed")
+	} else if buf[0] == 254 {
+		return errors.New("Chip response: request pending")
+	} else if buf[0] == 255 {
+		return errors.New("Chip response: no data")
+	} else {
+		return errors.New("Chip response: unknown")
 	}
-	time.Sleep(time.Millisecond * 2000)
-	fmt.Println("4.0 Calibration Complete")
-	_, err = i2cAccess.Read(buf)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("Press any key to perform 10.0 calibration")
-	_, _ = fmt.Scanln(&dummy)
-
-	calibrateHigh := "Cal,high,10.00"
-	byteArray = []byte(calibrateHigh)
-	_, err = i2cAccess.Write(byteArray)
-	if err != nil {
-		return err
-	}
-	time.Sleep(time.Millisecond * 2000)
-	fmt.Println("10.0 Calibration Complete")
-	_, err = i2cAccess.Read(buf)
-	if err != nil {
-		return err
-	}
-
-	// Return success
-	return nil
 }
 
 // Stub for future development
-func calibrateEc(i2cAccess *i2c.I2C) {
+func calibrateEc(i2cAccess *i2c.I2C) error {
+	return nil
 }
 
 // Status returns the status of the chip
