@@ -2,21 +2,20 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/user"
 	"strconv"
-	"time"
-	"github.com/pborman/uuid"
+
+	"github.com/alexcesaro/statsd"
 	"github.com/brianfoshee/aquire/atlas"
 	"github.com/brianfoshee/raspberrypi/onewire"
-	"github.com/quipo/statsd"
+	"github.com/pborman/uuid"
 )
 
 func main() {
 
 	deviceId := uuid.NewRandom().String()
-	usr,err := user.Current()
+	usr, err := user.Current()
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -25,13 +24,13 @@ func main() {
 
 	// if the device id exists on the device
 	if _, err := os.Stat(deviceIdPath); err == nil {
-		// open the file containing the id 
+		// open the file containing the id
 		f, err := os.Open(deviceIdPath)
 		if err != nil {
 			fmt.Println(err)
 		}
 
-		b := make([]byte,36)
+		b := make([]byte, 36)
 		_, err = f.Read(b)
 		if err != nil {
 			fmt.Println(err)
@@ -41,9 +40,9 @@ func main() {
 
 		fmt.Println("Using existing device id:", deviceId)
 
-	// if the device id does not exists
+		// if the device id does not exists
 	} else {
-		f,err := os.Create(deviceIdPath)
+		f, err := os.Create(deviceIdPath)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -70,14 +69,14 @@ func main() {
 		fmt.Println(err)
 	}
 
-	prefix := "aquaponics."
-	statsdclient := statsd.NewStatsdClient("159.203.144.95:8125", prefix)
-	if err := statsdclient.CreateSocket(); err != nil {
-		log.Println(err)
-		os.Exit(1)
+	stats, err := statsd.New(
+		statsd.Address("159.203.144.95:8125"),
+		statsd.Prefix("aquaponics"),
+	)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
-	interval := time.Second * 10
-	stats := statsd.NewStatsdBuffer(interval, statsdclient)
 	defer stats.Close()
 
 	// Forever
@@ -117,9 +116,9 @@ func main() {
 		ns := deviceId
 
 		// send to statsd
-		stats.FGauge(ns+".watertempf", tempF)
-		stats.FGauge(ns+".watertempc", tempC)
-		stats.FGauge(ns+".tds", tdsReading)
-		stats.FGauge(ns+".ph", phReading)
+		stats.Gauge(ns+".watertempf", tempF)
+		stats.Gauge(ns+".watertempc", tempC)
+		stats.Gauge(ns+".tds", tdsReading)
+		stats.Gauge(ns+".ph", phReading)
 	}
 }
