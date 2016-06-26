@@ -106,7 +106,6 @@ func main() {
 	// Forever
 	for {
 		tempSensors, err := onewire.ScanSlaves()
-		Info.Println("Length of tempSensors: ", len(tempSensors))
 		if err != nil {
 			Error.Println(err)
 		} else if len(tempSensors) > 0 {
