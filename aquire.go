@@ -105,16 +105,21 @@ func main() {
 
 	// Forever
 	for {
-		// open 1-wire communication to temp sensor
-		oneWire, err := onewire.NewDS18S20("28-031466321eff")
+		tempSensors, err := onewire.ScanSlaves()
 		if err != nil {
-			Info.Println("Temperature sensor not available, using default or temp from last reading if available")
+			Error.Println(err)
 		} else {
-			tempBuf, err := oneWire.Read()
+			// open 1-wire communication to temp sensor
+			oneWire, err := onewire.NewDS18S20(tempSensors[0])
 			if err != nil {
 				Info.Println("Temperature sensor not available, using default or temp from last reading if available")
 			} else {
-				tempRaw = tempBuf
+				tempBuf, err := oneWire.Read()
+				if err != nil {
+					Info.Println("Temperature sensor not available, using default or temp from last reading if available")
+				} else {
+					tempRaw = tempBuf
+				}
 			}
 		}
 
