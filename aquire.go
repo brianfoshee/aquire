@@ -5,7 +5,7 @@ import (
 	"os"
 	"os/user"
 	"strconv"
-
+	"time"
 	"github.com/alexcesaro/statsd"
 	"github.com/brianfoshee/aquire/atlas"
 	"github.com/brianfoshee/raspberrypi/onewire"
@@ -13,6 +13,10 @@ import (
 )
 
 func main() {
+	
+	// if temp sensor is not available, default temp to 25.428C, 77.7704F
+	// using distinct number so it's obvious when temp sensor is not available/working
+	var tempRaw int64 = 25428
 
 	deviceId := uuid.NewRandom().String()
 	usr, err := user.Current()
@@ -38,7 +42,7 @@ func main() {
 
 		deviceId = string(b)
 
-		fmt.Println("Using existing device id:", deviceId)
+		fmt.Println("Starting up using existing device id:", deviceId)
 
 		// if the device id does not exists
 	} else {
@@ -47,14 +51,8 @@ func main() {
 			fmt.Println(err)
 		}
 		f.WriteString(deviceId)
-		fmt.Println("Generated new device id:", deviceId)
+		fmt.Println("Starting up with new device id:", deviceId)
 		fmt.Println("Saving id to", deviceIdPath)
-	}
-
-	// open 1-wire communication to temp sensor
-	oneWire, err := onewire.NewDS18S20("28-031466321eff")
-	if err != nil {
-		fmt.Print(err)
 	}
 
 	// open i2c communication to ph
@@ -81,15 +79,21 @@ func main() {
 
 	// Forever
 	for {
-		// grab latest reading from temp sensor
-		tempRaw, err := oneWire.Read()
+		// open 1-wire communication to temp sensor
+		oneWire, err := onewire.NewDS18S20("28-031466321eff")
 		if err != nil {
-			fmt.Print(err)
-			tempRaw = 2222
+			fmt.Println(err)
+		} else {
+			tempBuf, err := oneWire.Read()
+			if err != nil {
+                                fmt.Println(err)
+			} else {
+				tempRaw = tempBuf
+                        }
 		}
 
 		// clean up reading
-		tempC := float64(tempRaw / 1000)
+		tempC := float64(tempRaw) / 1000
 		tempF := float64(tempC*9.0/5.0 + 32.0)
 
 		// convert reading to bytes
@@ -114,6 +118,9 @@ func main() {
 		tdsReading := ecChip.GetReading()
 
 		ns := deviceId
+
+		t := time.Now()
+		fmt.Printf("%s: temp '%v', ph'%v', tds '%v'\n",t,tempF,phReading,tdsReading)
 
 		// send to statsd
 		stats.Gauge(ns+".watertempf", tempF)
