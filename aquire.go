@@ -106,9 +106,10 @@ func main() {
 	// Forever
 	for {
 		tempSensors, err := onewire.ScanSlaves()
+		Info.Println("Length of tempSensors: ", len(tempSensors))
 		if err != nil {
 			Error.Println(err)
-		} else {
+		} else if len(tempSensors) > 0 {
 			// open 1-wire communication to temp sensor
 			oneWire, err := onewire.NewDS18S20(tempSensors[0])
 			if err != nil {
