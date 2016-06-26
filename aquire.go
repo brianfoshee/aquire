@@ -1,70 +1,96 @@
 package main
 
 import (
-	"fmt"
 	"github.com/alexcesaro/statsd"
 	"github.com/brianfoshee/aquire/atlas"
 	"github.com/brianfoshee/raspberrypi/onewire"
 	"github.com/pborman/uuid"
+	"log"
 	"os"
 	"os/user"
 	"strconv"
-	"time"
 )
 
-func main() {
+var (
+	Debug *log.Logger
+	Info  *log.Logger
+	Error *log.Logger
+)
 
+func initLogging(logOutput string) {
+	file, err := os.OpenFile(logOutput, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalln("Failed to open log file:", err)
+	}
+
+	Debug = log.New(file, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile)
+	Info = log.New(file, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	Error = log.New(file, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+}
+
+func main() {
 	// if temp sensor is not available, default temp to 25.428C, 77.7704F
 	// using distinct number so it's obvious when temp sensor is not available/working
 	var tempRaw int64 = 25428
+	var logOutput string = "hydroPi.log"
+	var deviceIdFile = ".hydroPiId"
 
-	deviceId := uuid.NewRandom().String()
+	//get user information
 	usr, err := user.Current()
 	if err != nil {
-		fmt.Println(err)
+		Info.Println(err, " - unable to get current user information, using current directory for file io")
+	} else {
+		logOutput = usr.HomeDir + "/hydroPi.log"
+		//store uuid in users home directory
+		deviceIdFile = usr.HomeDir + "/.hydroPiId"
 	}
 
-	deviceIdPath := usr.HomeDir + "/.hydroPiId"
+	//setup file for logging
+	initLogging(logOutput)
 
-	// if the device id exists on the device
-	if _, err := os.Stat(deviceIdPath); err == nil {
+	//generate uuid
+	deviceId := uuid.NewRandom().String()
+
+	// if the device id already exists on the device
+	if _, err := os.Stat(deviceIdFile); err == nil {
 		// open the file containing the id
-		f, err := os.Open(deviceIdPath)
+		f, err := os.Open(deviceIdFile)
 		if err != nil {
-			fmt.Println(err)
+			Info.Println(err)
 		}
 
 		b := make([]byte, 36)
 		_, err = f.Read(b)
 		if err != nil {
-			fmt.Println(err)
+			Info.Println(err)
 		}
 
 		deviceId = string(b)
 
-		fmt.Println("Starting up using existing device id:", deviceId)
+		Info.Println("Starting up using existing device id:", deviceId)
 
 		// if the device id does not exists
 	} else {
-		f, err := os.Create(deviceIdPath)
+		f, err := os.Create(deviceIdFile)
 		if err != nil {
-			fmt.Println(err)
+			Error.Println(err, " - unable to create file to store device id")
+		} else {
+			f.WriteString(deviceId)
 		}
-		f.WriteString(deviceId)
-		fmt.Println("Starting up with new device id:", deviceId)
-		fmt.Println("Saving id to", deviceIdPath)
+		Info.Println("Starting up with new device id:", deviceId)
+		Info.Println("Saving id to", deviceIdFile)
 	}
 
 	// open i2c communication to ph
 	phChip, err := atlas.New("ph")
 	if err != nil {
-		fmt.Println(err)
+		Error.Println(err)
 	}
 
 	// open i2c communication to ec
 	ecChip, err := atlas.New("ec")
 	if err != nil {
-		fmt.Println(err)
+		Error.Println(err)
 	}
 
 	stats, err := statsd.New(
@@ -72,7 +98,7 @@ func main() {
 		statsd.Prefix("aquaponics"),
 	)
 	if err != nil {
-		fmt.Println(err)
+		Error.Println(err)
 		return
 	}
 	defer stats.Close()
@@ -82,11 +108,11 @@ func main() {
 		// open 1-wire communication to temp sensor
 		oneWire, err := onewire.NewDS18S20("28-031466321eff")
 		if err != nil {
-			fmt.Println(err)
+			Info.Println("Temperature sensor not available, using default or temp from last reading if available")
 		} else {
 			tempBuf, err := oneWire.Read()
 			if err != nil {
-				fmt.Println(err)
+				Info.Println("Temperature sensor not available, using default or temp from last reading if available")
 			} else {
 				tempRaw = tempBuf
 			}
@@ -104,28 +130,25 @@ func main() {
 		// update phChip.reading
 		err = phChip.UpdateReading(byteTemp)
 		if err != nil {
-			fmt.Println(err)
+			Error.Println(err)
 		}
 
 		// update ecChip.reading
 		ecChip.UpdateReading(byteTemp)
 		if err != nil {
-			fmt.Println(err)
+			Error.Println(err)
 		}
 
 		// access new readings
 		phReading := phChip.GetReading()
 		tdsReading := ecChip.GetReading()
 
-		ns := deviceId
-
-		t := time.Now()
-		fmt.Printf("%s: temp '%v', ph'%v', tds '%v'\n", t, tempF, phReading, tdsReading)
+		Debug.Printf("temp '%v', ph'%v', tds '%v'\n", tempF, phReading, tdsReading)
 
 		// send to statsd
-		stats.Gauge(ns+".watertempf", tempF)
-		stats.Gauge(ns+".watertempc", tempC)
-		stats.Gauge(ns+".tds", tdsReading)
-		stats.Gauge(ns+".ph", phReading)
+		stats.Gauge(deviceId+".watertempf", tempF)
+		stats.Gauge(deviceId+".watertempc", tempC)
+		stats.Gauge(deviceId+".tds", tdsReading)
+		stats.Gauge(deviceId+".ph", phReading)
 	}
 }
