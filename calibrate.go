@@ -11,23 +11,23 @@ func getProbe() int {
 	fmt.Println("Please select the type of probe you want to calibrate")
 	fmt.Println("1. PH")
 	fmt.Println("2. EC")
-	fmt.Println("3. DO") 
+	fmt.Println("3. DO")
 	fmt.Println("4. ORP")
 	fmt.Print("Probe number: ")
 
-	_,_ = fmt.Scanln(&probe)
+	_, _ = fmt.Scanln(&probe)
 
 	// While user input is not valid, continue to ask
-	for (probe < 1 || probe > 4) {
+	for probe < 1 || probe > 4 {
 		fmt.Println("")
 		fmt.Println("Invalid input, please input the number that corresponds with the probe you are using")
 		fmt.Println("For example, if you are calibrating a PH probe enter '1'")
 		fmt.Println("1. PH")
 		fmt.Println("2. EC")
-		fmt.Println("3. DO") 
+		fmt.Println("3. DO")
 		fmt.Println("4. ORP")
 		fmt.Print("Probe number: ")
-		_,_ = fmt.Scanln(&probe)
+		_, _ = fmt.Scanln(&probe)
 	}
 
 	return probe
@@ -36,7 +36,7 @@ func getProbe() int {
 func main() {
 	var dummy string
 	var calSolution float64
-	
+
 	probe := getProbe()
 
 	switch probe {
@@ -44,10 +44,10 @@ func main() {
 	case 1:
 		fmt.Print("Enter PH Calibration Solution: ")
 		fmt.Scanf("%f", &calSolution)
-		for (calSolution < 0 || calSolution > 14) {
+		for calSolution < 0 || calSolution > 14 {
 			fmt.Println("Invalid input, valid PH range is 0-14 inclusive")
 			fmt.Print("Enter Calibration Solution: ")
-			fmt.Scanf("%f", &calSolution)		
+			fmt.Scanf("%f", &calSolution)
 		}
 
 		phChip, err := atlas.New("ph")
@@ -55,7 +55,7 @@ func main() {
 			fmt.Println(err)
 		}
 		fmt.Print("Submerge PH probe in solution for 30 seconds then press any key to calibrate")
-		_,_ = fmt.Scanln(&dummy)
+		_, _ = fmt.Scanln(&dummy)
 		fmt.Println("Calibrating...")
 		err = phChip.Calibrate(calSolution)
 		if err != nil {
@@ -73,5 +73,5 @@ func main() {
 	case 4:
 		fmt.Println("Calibration not yet available for ORP probe")
 	}
-	
+
 }

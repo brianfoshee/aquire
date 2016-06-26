@@ -2,18 +2,18 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"os/user"
-	"strconv"
-	"time"
 	"github.com/alexcesaro/statsd"
 	"github.com/brianfoshee/aquire/atlas"
 	"github.com/brianfoshee/raspberrypi/onewire"
 	"github.com/pborman/uuid"
+	"os"
+	"os/user"
+	"strconv"
+	"time"
 )
 
 func main() {
-	
+
 	// if temp sensor is not available, default temp to 25.428C, 77.7704F
 	// using distinct number so it's obvious when temp sensor is not available/working
 	var tempRaw int64 = 25428
@@ -86,10 +86,10 @@ func main() {
 		} else {
 			tempBuf, err := oneWire.Read()
 			if err != nil {
-                                fmt.Println(err)
+				fmt.Println(err)
 			} else {
 				tempRaw = tempBuf
-                        }
+			}
 		}
 
 		// clean up reading
@@ -120,7 +120,7 @@ func main() {
 		ns := deviceId
 
 		t := time.Now()
-		fmt.Printf("%s: temp '%v', ph'%v', tds '%v'\n",t,tempF,phReading,tdsReading)
+		fmt.Printf("%s: temp '%v', ph'%v', tds '%v'\n", t, tempF, phReading, tdsReading)
 
 		// send to statsd
 		stats.Gauge(ns+".watertempf", tempF)
