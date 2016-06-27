@@ -34,6 +34,7 @@ func main() {
 	var tempRaw int64 = 25428
 	var logOutput string = "hydroPi.log"
 	var deviceIdFile = ".hydroPiId"
+	var oneWire *onewire.DS18S20
 
 	//get user information
 	usr, err := user.Current()
@@ -103,23 +104,27 @@ func main() {
 	}
 	defer stats.Close()
 
+	tempSensors, err := onewire.ScanSlaves()
+	if err != nil {
+		Error.Println(err)
+	} else if len(tempSensors) > 0 {
+		// open 1-wire communication to temp sensor
+		oneWire, err = onewire.NewDS18S20(tempSensors[0])
+		if err != nil {
+			Info.Println("Error instantiating onewire communication to temperature sensor", err)
+		}
+	} else {
+		Info.Println("No temperature sensors detected, using default temp")
+	} 
+
 	// Forever
 	for {
-		tempSensors, err := onewire.ScanSlaves()
-		if err != nil {
-			Error.Println(err)
-		} else if len(tempSensors) > 0 {
-			// open 1-wire communication to temp sensor
-			oneWire, err := onewire.NewDS18S20(tempSensors[0])
+		if oneWire != nil {
+			tempBuf, err := oneWire.Read()
 			if err != nil {
 				Info.Println("Temperature sensor not available, using default or temp from last reading if available")
 			} else {
-				tempBuf, err := oneWire.Read()
-				if err != nil {
-					Info.Println("Temperature sensor not available, using default or temp from last reading if available")
-				} else {
-					tempRaw = tempBuf
-				}
+				tempRaw = tempBuf
 			}
 		}
 
